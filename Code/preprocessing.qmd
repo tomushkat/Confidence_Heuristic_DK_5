@@ -1,0 +1,155 @@
+---
+title: "preprocessing"
+format: html
+editor: visual
+---
+
+```{r}
+
+pacman::p_load(tidyverse, here, doSPSS)
+
+reverse_meti <- function(data) {
+  
+  data_1 <- 8 - data
+  
+  return(data_1)
+  
+  
+}
+
+
+replaceMETI <- function(data, Condition, goodChar){
+  
+  if((Condition == 'brownKnow' & goodChar == TRUE) | (Condition == 'blueKnow' & goodChar == FALSE)){
+  
+    data <- case_when (
+    
+      data == 'Analyst Blue' ~ 7
+      , data == ')))' ~ 6
+      , data == '))' ~ 5
+      , data == '=' ~ 4
+      , data == '((' ~ 3
+      , data == '(((' ~ 2
+      , T ~ 1
+  )
+  
+} else if((Condition == 'brownKnow' & goodChar == FALSE) | (Condition == 'blueKnow' & goodChar == TRUE)){
+  
+  data <- case_when (
+    
+      data == 'Analyst Blue' ~ 1
+      , data == ')))' ~ 2
+      , data == '))' ~ 3
+      , data == '=' ~ 4
+      , data == '((' ~ 5
+      , data == '(((' ~ 6
+      , T ~ 7
+    )
+  }
+   return(data)
+}
+
+Data <- read_csv(here('Data\\to_proccess.csv'))
+```
+
+```{r}
+Data_1 <- Data %>% 
+  drop_na(Consecutively) %>% 
+  mutate(whoNotKnow_correct = if_else((Condition == 'blue_know' & whoNotKnow == 'Analyst Brown') |
+                                        (Condition == 'brown_know' & whoNotKnow == 'Analyst Blue'), 1, 0)) %>% 
+  filter(Consecutively == 'Yes'
+         , Disturbances == 'No'
+         , Alone == 'Alone'
+         , whoNotKnow_correct == 1
+         , Honesty == 'Yes, I put in a reasonable effort') %>% 
+  mutate(clean_duration = sdOutliers(`Duration (in seconds)`)) %>% 
+  drop_na(clean_duration)
+```
+
+
+
+```{r, warning=FALSE, message=FALSE}
+brownKnow <- Data_1 %>% 
+  filter(Condition == 'brown_know')
+
+
+brownKnow <- brownKnow %>% 
+mutate(METI_1_2 = replaceMETI(METI_1_2, Condition = 'brownKnow', goodChar = TRUE),
+       METI_1_4 = replaceMETI(METI_1_4, Condition = 'brownKnow', goodChar = TRUE),
+       METI_1_7 = replaceMETI(METI_1_7, Condition = 'brownKnow', goodChar = TRUE),
+       METI_1_8 = replaceMETI(METI_1_8, Condition = 'brownKnow', goodChar = TRUE),
+       METI_2_1 = replaceMETI(METI_2_1, Condition = 'brownKnow', goodChar = TRUE),
+       METI_2_2 = replaceMETI(METI_2_2, Condition = 'brownKnow', goodChar = TRUE),
+       METI_2_4 = replaceMETI(METI_2_4, Condition = 'brownKnow', goodChar = TRUE),
+       METI_2_6 = replaceMETI(METI_2_6, Condition = 'brownKnow', goodChar = TRUE),
+       METI_2_7 = replaceMETI(METI_2_7, Condition = 'brownKnow', goodChar = TRUE),
+       
+       
+       METI_1_1 = replaceMETI(METI_1_1, Condition = 'brownKnow', goodChar = FALSE),
+       METI_1_3 = replaceMETI(METI_1_3, Condition = 'brownKnow', goodChar = FALSE),
+       METI_1_5 = replaceMETI(METI_1_5, Condition = 'brownKnow', goodChar = FALSE),
+       METI_1_6 = replaceMETI(METI_1_6, Condition = 'brownKnow', goodChar = FALSE),
+       METI_2_3 = replaceMETI(METI_2_3, Condition = 'brownKnow', goodChar = FALSE),
+       METI_2_5 = replaceMETI(METI_2_5, Condition = 'brownKnow', goodChar = FALSE),
+       METI_2_8 = replaceMETI(METI_2_8, Condition = 'brownKnow', goodChar = FALSE)) %>% 
+  mutate(stock_market = if_else(stock_market %in% c('1\nCompletely unfamiliar', '2\nNot very familiar'), 0, 1) 
+         , DV_1 = if_else(first_gamble == 'Analyst Brown', 'prefereKnow', 'prefereDK')
+         , DV_2 = if_else(second_gamble == 'Analyst Brown', 'prefereKnow', 'prefereDK')) %>%
+  mutate(changeDV = case_when(DV_1 == 'prefereKnow' & DV_2 == 'prefereKnow' ~ 'prefereKnow'
+                              , DV_1 == 'prefereDK' & DV_2 == 'prefereDK' ~ 'prefereDK'
+                              , DV_1 == 'prefereDK' & DV_2 == 'prefereKnow' ~ 'change_To_Know'
+                              , T ~            'change_To_DK')
+         , whoErrors = case_when(whoErrors == 'Analyst Brown' ~ 'knowError'
+                                 , whoErrors == 'Analyst Blue' ~ 'DKError'
+                                 , T ~ whoErrors))
+
+
+
+
+blueKnow <- Data_1 %>% 
+  filter(Condition == 'blue_know')
+
+
+blueKnow <- blueKnow %>% 
+mutate(METI_1_2 = replaceMETI(METI_1_2, Condition = 'blueKnow', goodChar = TRUE),
+       METI_1_4 = replaceMETI(METI_1_4, Condition = 'blueKnow', goodChar = TRUE),
+       METI_1_7 = replaceMETI(METI_1_7, Condition = 'blueKnow', goodChar = TRUE),
+       METI_1_8 = replaceMETI(METI_1_8, Condition = 'blueKnow', goodChar = TRUE),
+       METI_2_1 = replaceMETI(METI_2_1, Condition = 'blueKnow', goodChar = TRUE),
+       METI_2_2 = replaceMETI(METI_2_2, Condition = 'blueKnow', goodChar = TRUE),
+       METI_2_4 = replaceMETI(METI_2_4, Condition = 'blueKnow', goodChar = TRUE),
+       METI_2_6 = replaceMETI(METI_2_6, Condition = 'blueKnow', goodChar = TRUE),
+       METI_2_7 = replaceMETI(METI_2_7, Condition = 'blueKnow', goodChar = TRUE),
+       
+       
+       METI_1_1 = replaceMETI(METI_1_1, Condition = 'blueKnow', goodChar = FALSE),
+       METI_1_3 = replaceMETI(METI_1_3, Condition = 'blueKnow', goodChar = FALSE),
+       METI_1_5 = replaceMETI(METI_1_5, Condition = 'blueKnow', goodChar = FALSE),
+       METI_1_6 = replaceMETI(METI_1_6, Condition = 'blueKnow', goodChar = FALSE),
+       METI_2_3 = replaceMETI(METI_2_3, Condition = 'blueKnow', goodChar = FALSE),
+       METI_2_5 = replaceMETI(METI_2_5, Condition = 'blueKnow', goodChar = FALSE),
+       METI_2_8 = replaceMETI(METI_2_8, Condition = 'blueKnow', goodChar = FALSE)) %>% 
+  mutate(stock_market = if_else(stock_market %in% c('1\nCompletely unfamiliar', '2\nNot very familiar'), 0, 1) 
+         , DV_1 = if_else(first_gamble == 'Analyst Blue', 'prefereKnow', 'prefereDK')
+         , DV_2 = if_else(second_gamble == 'Analyst Blue', 'prefereKnow', 'prefereDK')) %>%
+    mutate(changeDV = case_when(DV_1 == 'prefereKnow' & DV_2 == 'prefereKnow' ~ 'prefereKnow'
+                                , DV_1 == 'prefereDK' & DV_2 == 'prefereDK' ~ 'prefereDK'
+                                , T ~ 'change_To_DK')
+           , whoErrors = case_when(whoErrors == 'Analyst Blue' ~ 'knowError'
+                                   , whoErrors == 'Analyst Brown' ~ 'DKError'
+                                   , T ~ whoErrors))
+                        
+
+
+
+Data_2 <- rbind(brownKnow, blueKnow) %>% 
+  mutate(METI = rowMeans(cbind(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6, METI_1_8, METI_2_1, METI_2_2, METI_2_3, METI_2_5, METI_2_6, METI_2_7, METI_2_8))
+         , expertise = rowMeans(cbind(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6))
+         , integrity = rowMeans(cbind(METI_1_8, METI_2_1, METI_2_2, METI_2_3))
+         , benevolence = rowMeans(cbind(METI_2_5, METI_2_6, METI_2_7, METI_2_8)))
+
+```
+
+
+
+
