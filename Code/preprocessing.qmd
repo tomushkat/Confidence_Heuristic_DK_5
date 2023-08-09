@@ -6,7 +6,7 @@ editor: visual
 
 ```{r}
 
-pacman::p_load(tidyverse, here, doSPSS)
+pacman::p_load(tidyverse, here, doSPSS, psych, skimr, PerformanceAnalytics)
 
 reverse_meti <- function(data) {
   
@@ -14,6 +14,23 @@ reverse_meti <- function(data) {
   
   return(data_1)
   
+  
+}
+
+test_theoretical_dist <- function(data) {
+  
+  l_data <- length(data)
+  L <- c()
+  for (i in 1:5000) {
+  
+
+  s <- sample(data, size = l_data, replace = T)
+  Mean <- mean(s)
+  L <- c(L, Mean)
+  }
+  
+  fig <- shapiro.test(L)
+  return(fig)
   
 }
 
@@ -48,22 +65,44 @@ replaceMETI <- function(data, Condition, goodChar){
   }
    return(data)
 }
+survay_data <- read_csv(here('Data\\second part\\to_merge.csv')) 
+  
 
-Data <- read_csv(here('Data\\to_proccess.csv'))
+Data <- read_csv(here('Data\\first part\\to_proccess.csv')) 
+
+
+  
+
+not_complete <- Data %>% 
+  left_join(survay_data, by = 'Q1') %>% 
+  filter(is.na(RWA6) == TRUE)
+
+complete <- Data %>% 
+  left_join(survay_data, by = 'Q1') %>% 
+  filter(is.na(RWA6) == FALSE)
+
+not_complete$Q1
+complete$Q1 %>% view()
+
+test <- read_csv(here('Data\\first part\\to_proccess.csv')) %>% 
+  right_join(survay_data, by = 'Q1')
+
 ```
 
 ```{r}
-Data_1 <- Data %>% 
-  drop_na(Consecutively) %>% 
+Data_1 <- 
+  
+  Data %>% 
+  # drop_na(Consecutively) %>% 
   mutate(whoNotKnow_correct = if_else((Condition == 'blue_know' & whoNotKnow == 'Analyst Brown') |
-                                        (Condition == 'brown_know' & whoNotKnow == 'Analyst Blue'), 1, 0)) %>% 
-  filter(Consecutively == 'Yes'
-         , Disturbances == 'No'
-         , Alone == 'Alone'
-         , whoNotKnow_correct == 1
-         , Honesty == 'Yes, I put in a reasonable effort') %>% 
-  mutate(clean_duration = sdOutliers(`Duration (in seconds)`)) %>% 
-  drop_na(clean_duration)
+                                        (Condition == 'brown_know' & whoNotKnow == 'Analyst Blue'), 1, 0)
+         , duration_minutes = `Duration (in seconds)` / 60) %>% 
+  filter(Consecutively == 'Yes' 
+         , Disturbances == 'No' 
+         , Alone == 'Alone' 
+         , whoNotKnow_correct == 1 
+         , Honesty == 'Yes, I put in a reasonable effort'
+         , duration_minutes <= 20) 
 ```
 
 
@@ -101,7 +140,11 @@ mutate(METI_1_2 = replaceMETI(METI_1_2, Condition = 'brownKnow', goodChar = TRUE
                               , T ~            'change_To_DK')
          , whoErrors = case_when(whoErrors == 'Analyst Brown' ~ 'knowError'
                                  , whoErrors == 'Analyst Blue' ~ 'DKError'
-                                 , T ~ whoErrors))
+                                 , T ~ whoErrors)
+         , conf_first = if_else(who_first == 'Brown', 'Know', 'DK')
+         , conf_second = if_else(who_first == 'Brown', 'DK', 'Know')
+         , correctness_first = if_else(who_first == 'Brown', 'Know', 'DK')
+         , correctness_second = if_else(who_first == 'Brown', 'DK', 'Know'))
 
 
 
@@ -137,12 +180,16 @@ mutate(METI_1_2 = replaceMETI(METI_1_2, Condition = 'blueKnow', goodChar = TRUE)
                                 , T ~ 'change_To_DK')
            , whoErrors = case_when(whoErrors == 'Analyst Blue' ~ 'knowError'
                                    , whoErrors == 'Analyst Brown' ~ 'DKError'
-                                   , T ~ whoErrors))
+                                   , T ~ whoErrors)
+           , conf_first = if_else(who_first == 'Blue', 'Know', 'DK')
+           , conf_second = if_else(who_first == 'Blue', 'DK', 'Know')
+           , correctness_first = if_else(who_first == 'Blue', 'Know', 'DK')
+           , correctness_second = if_else(who_first == 'Blue', 'DK', 'Know'))
                         
 
 
 
-Data_2 <- rbind(brownKnow, blueKnow) %>% 
+Data_phase_1 <- rbind(brownKnow, blueKnow) %>% 
   mutate(METI = rowMeans(cbind(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6, METI_1_8, METI_2_1, METI_2_2, METI_2_3, METI_2_5, METI_2_6, METI_2_7, METI_2_8))
          , expertise = rowMeans(cbind(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6))
          , integrity = rowMeans(cbind(METI_1_8, METI_2_1, METI_2_2, METI_2_3))
@@ -152,4 +199,325 @@ Data_2 <- rbind(brownKnow, blueKnow) %>%
 
 
 
+```{r}
+GoF(Data_phase_1$DV_1, Probs = c(0.5, 0.5))
+GoF(Data_phase_1$DV_2, Probs = c(0.5, 0.5))
+GoF(Data_phase_1$changeDV[Data_2$changeDV != 'change_To_Know'], Probs = c(1 / 3, 1 / 3, 1 / 3))
+```
+
+```{r}
+t_1 <- Data_phase_1 %>% 
+  filter(conf_first == 'DK') %>% 
+  mutate(confidance_identity = 'IDK') %>% 
+  select(confidance = Confi_first, confidance_identity, Q1)
+t_2 <- 
+Data_phase_1 %>% 
+  filter(conf_second == 'DK') %>% 
+  mutate(confidance_identity = 'IDK') %>% 
+  select(confidance = Confi_second, confidance_identity, Q1)
+t_3 <- rbind(t_1, t_2)  
+
+
+t_4 <- 
+Data_phase_1 %>% 
+  filter(conf_first == 'Know') %>% 
+  mutate(confidance_identity = 'Know') %>% 
+  select(confidance = Confi_first, confidance_identity, Q1)
+t_5 <- 
+Data_phase_1 %>% 
+  filter(conf_second == 'Know') %>% 
+  mutate(confidance_identity = 'Know') %>% 
+  select(confidance = Confi_second, confidance_identity, Q1)
+t_6 <- rbind(t_4, t_5)  
+
+t_7 <- rbind(t_3, t_6)
+t_7 %>% 
+  arrange(Q1, confidance_identity)
+
+pairedT(t_7$confidance, t_7$confidance_identity, Within = t_7$Q1)
+```
+
+
+```{r}
+t_1 <- Data_phase_1 %>% 
+  filter(correctness_first == 'DK') %>% 
+  mutate(confidance_identity = 'IDK') %>% 
+  select(Accuracy = correct_first, confidance_identity, Q1)
+t_2 <- 
+Data_phase_1 %>% 
+  filter(correctness_second == 'DK') %>% 
+  mutate(confidance_identity = 'IDK') %>% 
+  select(Accuracy = correct_second, confidance_identity, Q1)
+t_3 <- rbind(t_1, t_2)  
+
+
+t_4 <- 
+Data_phase_1 %>% 
+  filter(correctness_first == 'Know') %>% 
+  mutate(confidance_identity = 'Know') %>% 
+  select(Accuracy = correct_first, confidance_identity, Q1)
+t_5 <- 
+Data_phase_1 %>% 
+  filter(correctness_second == 'Know') %>% 
+  mutate(confidance_identity = 'Know') %>% 
+  select(Accuracy = correct_second, confidance_identity, Q1)
+t_6 <- rbind(t_4, t_5)  
+
+t_7 <- rbind(t_3, t_6)
+t_7 %>% 
+  arrange(Q1, confidance_identity)
+
+pairedT(t_7$Accuracy, t_7$confidance_identity, Within = t_7$Q1)
+```
+
+```{r}
+Data_phase_1 %>% 
+  select(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6, METI_1_8, METI_2_1, METI_2_2, METI_2_3, METI_2_5, METI_2_6, METI_2_7, METI_2_8) %>% 
+  alpha(cbind('METI_1_1', 'METI_1_2', 'METI_1_3', 'METI_1_4', 'METI_1_5', 'METI_1_6', 'METI_1_8', 'METI_2_1', 'METI_2_2', 'METI_2_3', 'METI_2_5', 'METI_2_6', 'METI_2_7', 'METI_2_8'))
+Data_phase_1 %>% 
+  select(METI_1_1, METI_1_2, METI_1_3, METI_1_4, METI_1_5, METI_1_6) %>% 
+  alpha(cbind('METI_1_1', 'METI_1_2', 'METI_1_3', 'METI_1_4', 'METI_1_5', 'METI_1_6'))
+
+Data_phase_1 %>% 
+  select(METI_1_8, METI_2_1, METI_2_2, METI_2_3) %>% 
+  alpha(cbind('METI_1_8', 'METI_2_1', 'METI_2_2', 'METI_2_3'))
+
+Data_phase_1 %>% 
+  select(METI_2_5, METI_2_6, METI_2_7, METI_2_8) %>% 
+  alpha(cbind(
+    'METI_2_5', 'METI_2_6', 'METI_2_7', 'METI_2_8'))
+
+
+shapiro.test(Data_phase_1$METI)
+shapiro.test(Data_phase_1$expertise)
+shapiro.test(Data_phase_1$integrity)
+shapiro.test(Data_phase_1$benevolence)
+
+test_theoretical_dist(Data_phase_1$METI)
+test_theoretical_dist(Data_phase_1$integrity)
+test_theoretical_dist(Data_phase_1$benevolence)
+
+chart.Correlation(Data_phase_1[, c('METI', 'expertise', 'integrity', 'benevolence')], histogram = TRUE, pch = 19)
+```
+
+```{r}
+oneSampleTest(Data_phase_1$METI, MU = 4, Parametric = TRUE)
+oneSampleTest(Data_phase_1$expertise, MU = 4, Parametric = TRUE)
+oneSampleTest(Data_phase_1$integrity, MU = 4, Parametric = TRUE)
+oneSampleTest(Data_phase_1$benevolence, MU = 4, Parametric = TRUE)
+```
+
+```{r}
+oneWayAnova(Data_phase_1$METI[Data_phase_1$changeDV != 'change_To_Know'], Data_phase_1$changeDV[Data_phase_1$changeDV != 'change_To_Know'])
+oneWayAnova(Data_phase_1$expertise[Data_phase_1$changeDV != 'change_To_Know'], Data_phase_1$changeDV[Data_phase_1$changeDV != 'change_To_Know'])
+oneWayAnova(Data_phase_1$integrity[Data_phase_1$changeDV != 'change_To_Know'], Data_phase_1$changeDV[Data_phase_1$changeDV != 'change_To_Know'])
+oneWayAnova(Data_phase_1$benevolence[Data_phase_1$changeDV != 'change_To_Know'], Data_phase_1$changeDV[Data_phase_1$changeDV != 'change_To_Know'])
+```
+
+
+
+# Phase 2
+
+```{r}
+Data_3 <- Data_phase_1 %>% 
+  inner_join(survay_data, by = 'Q1') 
+  
+Data_4 <- Data_3 %>% 
+  filter(`Duration (in seconds) 2` / 60 <= 20
+         , Attention_2 == '6\n(Slightly agree)\n')
+
+
+
+be_numeric <- function(data, question, reverse = FALSE) {
+  
+  if(question == "ITU"){
+    
+    data_1 <- as.numeric(case_when(
+        data == "1\n(Not at all characteristic of me)" ~ '1'
+        , data == "2\n\n\n" ~ '2'
+        , data == "3\n\n\n" ~ '3'
+        , data == "4\n\n\n" ~ '4'
+        , T  ~ '5'
+    )
+    )
+    
+  } else if (question == "HH"){
+    
+      data_1 <- case_when(
+        data == "1\n(Strongly disagree)\n\n" ~ 1
+        , data == "2\n(Disagree)\n\n\n" ~ 2
+        , data == "3\n(Neutral - neither agree nor disagree)" ~ 3
+        , data == "4\n(Agree)\n\n\n" ~ 4
+        , T  ~ 5
+      
+      )
+    
+  } else if (question == "TA") {
+    
+     data_1 <- as.numeric(case_when(
+        data == "1\n(Strongly disagree)\n\n" ~ 1
+        , data == "2\n\n\n\n" ~ 2
+        , data == "3\n(Neutral - neither agree nor disagree)" ~ 3
+        , data == "4\n\n\n\n" ~ 4
+        , T  ~ 5
+      
+      )
+      )
+    
+  } else if (question == "RWA") {
+    
+     data_1 <-as.numeric(case_when(
+        data == "1\n(Very strongly disagree)" ~ 1
+        , data == "2\n(Strongly disagree)\n" ~ 2
+        , data == "3\n(Somewhat disagree)\n" ~ 3
+        , data == "4\n(Slightly disagree)\n " ~ 4
+        , data == "5\n(Unsure or neutral)" ~ 5
+        , data == "6\n(Slightly agree)\n" ~ 6
+        , data == "7\n(Somewhat agree)\n" ~ 7
+        , data == "8\n(Storngly agree)\n  " ~ 8
+        , T  ~ 9
+      
+      )
+      )
+    
+  }
+  
+  if(reverse){
+    if(question == "RWA"){
+      
+      data_1 <- 10 - data_1
+      
+    } else {
+      
+      data_1 <- 6 - data_1
+    }
+  }
+  
+  return(data_1)
+  
+}
+
+Data_4 <- Data_4 %>% 
+  mutate(num_ITU1 = be_numeric(ITU1, 'ITU', reverse = FALSE)
+         , num_ITU2 = be_numeric(ITU2, 'ITU', reverse = FALSE)
+         , num_ITU3 = be_numeric(ITU3, 'ITU', reverse = FALSE)
+         , num_ITU4 = be_numeric(ITU4, 'ITU', reverse = FALSE)
+         , num_ITU5 = be_numeric(ITU5, 'ITU', reverse = FALSE)
+         , num_ITU6 = be_numeric(ITU6, 'ITU', reverse = FALSE)
+         , num_ITU7 = be_numeric(ITU7, 'ITU', reverse = FALSE)
+         , num_ITU8 = be_numeric(ITU8, 'ITU', reverse = FALSE)
+         , num_ITU9 = be_numeric(ITU9, 'ITU', reverse = FALSE)
+         , num_ITU10 = be_numeric(ITU10, 'ITU', reverse = FALSE)
+         , num_ITU11 = be_numeric(ITU11, 'ITU', reverse = FALSE)
+         , num_ITU12 = be_numeric(ITU12, 'ITU', reverse = FALSE)
+         ) %>% 
+  mutate(num_HH1 = be_numeric(HH1, 'HH', reverse = FALSE)
+         , num_HH2 = be_numeric(HH2, 'HH', reverse = TRUE)
+         , num_HH3 = be_numeric(HH3, 'HH', reverse = FALSE)
+         , num_HH4 = be_numeric(HH4, 'HH', reverse = TRUE)
+         , num_HH5 = be_numeric(HH5, 'HH', reverse = FALSE)
+         , num_HH6 = be_numeric(HH6, 'HH', reverse = TRUE)
+         , num_HH7 = be_numeric(HH7, 'HH', reverse = FALSE)
+         , num_HH8 = be_numeric(HH8, 'HH', reverse = TRUE)
+         , num_HH9 = be_numeric(HH9, 'HH', reverse = TRUE)
+         , num_HH10 = be_numeric(HH10, 'HH', reverse = TRUE)
+         ) %>% 
+  mutate(num_TA1 = be_numeric(TA1, 'TA', reverse = TRUE)
+         , num_TA2 = be_numeric(TA2, 'TA', reverse = FALSE)
+         , num_TA3 = be_numeric(TA3, 'TA', reverse = FALSE)
+         , num_TA4 = be_numeric(TA4, 'TA', reverse = TRUE)
+         , num_TA5 = be_numeric(TA5, 'TA', reverse = TRUE)
+         , num_TA6 = be_numeric(TA6, 'TA', reverse = FALSE)
+         , num_TA7 = be_numeric(TA7, 'TA', reverse = FALSE)
+         , num_TA8 = be_numeric(TA8, 'TA', reverse = FALSE)
+         , num_TA9 = be_numeric(TA9, 'TA', reverse = TRUE)
+         , num_TA10 = be_numeric(TA10, 'TA', reverse = TRUE)
+         , num_TA11 = be_numeric(TA11, 'TA', reverse = TRUE)
+         , num_TA12 = be_numeric(TA12, 'TA', reverse = TRUE)
+         ) %>% 
+  mutate(num_RWA1 = be_numeric(RWA1, 'RWA', reverse = TRUE)
+         , num_RWA2 = be_numeric(RWA2, 'RWA', reverse = FALSE)
+         , num_RWA3 = be_numeric(RWA3, 'RWA', reverse = FALSE)
+         , num_RWA4 = be_numeric(RWA4, 'RWA', reverse = TRUE)
+         , num_RWA5 = be_numeric(RWA5, 'RWA', reverse = TRUE)
+         , num_RWA6 = be_numeric(RWA6, 'RWA', reverse = FALSE)
+         )
+
+Data_phase_2 <- Data_4 %>% 
+  mutate(num_ITU = rowMeans(cbind(num_ITU1, num_ITU2, num_ITU3, num_ITU4, num_ITU5, num_ITU6
+                            , num_ITU7, num_ITU8, num_ITU9, num_ITU10, num_ITU11, num_ITU12))
+         , num_HH = rowMeans(cbind(num_HH1, num_HH2, num_HH3, num_HH4, num_HH5
+                             , num_HH6, num_HH7, num_HH8, num_HH9, num_HH10))
+         , num_TA = rowMeans(cbind(num_TA1, num_TA2, num_TA3, num_TA4, num_TA5, num_TA6
+                             , num_TA7, num_TA8, num_TA9, num_TA10, num_TA11, num_TA12))
+         , num_RWA = rowMeans(cbind(num_RWA1, num_RWA2, num_RWA3
+                                    , num_RWA4, num_RWA5, num_RWA6))
+  ) %>% 
+  mutate(num_ITU_positive = 6 - num_ITU
+         , num_RWA_positive = 10 - num_RWA) %>% 
+  mutate(norm_ITU_positive = scale(num_ITU_positive)
+         , norm_HH = scale(num_HH)
+         , norm_TA = scale(num_TA)
+         , norm_RWA_positive = scale(num_RWA_positive))
+```
+
+
+```{r}
+Data_phase_2 %>% 
+  select(num_ITU1, num_ITU2, num_ITU3, num_ITU4, num_ITU5, num_ITU6
+         , num_ITU7, num_ITU8, num_ITU9, num_ITU10, num_ITU11, num_ITU12) %>% 
+  psych::alpha()
+
+Data_phase_2 %>% 
+  select(num_HH1, num_HH2, num_HH3, num_HH4, num_HH5
+         , num_HH6, num_HH7, num_HH8, num_HH9, num_HH10) %>% 
+  psych::alpha()
+
+Data_phase_2 %>% 
+  select(num_TA1, num_TA2, num_TA3, num_TA4, num_TA5, num_TA6
+         , num_TA7, num_TA8, num_TA9, num_TA10, num_TA11, num_TA12) %>% 
+  psych::alpha()
+
+Data_phase_2 %>% 
+  select(num_RWA1, num_RWA2, num_RWA3
+         , num_RWA4, num_RWA5, num_RWA6) %>% 
+  psych::alpha()
+
+shapiro.test(Data_phase_2$norm_ITU_positive)
+shapiro.test(Data_phase_2$norm_HH)
+shapiro.test(Data_phase_2$norm_TA)
+shapiro.test(Data_phase_2$norm_RWA_positive)
+
+test_theoretical_dist(Data_5$norm_RWA_positive)
+
+chart.Correlation(Data_phase_2[, c('norm_ITU_positive', 'norm_HH', 'norm_TA', 'norm_RWA_positive')], histogram = TRUE, pch = 19, method = 'pearson')
+```
+
+
+```{r}
+indttest(Data_phase_2$num_ITU_positive, Data_phase_2$DV_1)
+indttest(Data_phase_2$norm_HH, Data_phase_2$DV_1)
+indttest(Data_phase_2$norm_TA, Data_phase_2$DV_1)
+indttest(Data_phase_2$norm_RWA_positive, Data_phase_2$DV_1)
+
+
+doSPSS::logReg(Data_phase_2$DV_1, Data_phase_2[, c('num_ITU_positive'
+                                                   , 'norm_HH'
+                                                   , 'norm_TA'
+                                                   , 'norm_RWA_positive')])
+
+
+                                              
+```
+
+
+
+
+
+```{r}
+oneWayAnova(Data_phase_2$num_ITU_positive, Data_phase_2$changeDV)
+oneWayAnova(Data_phase_2$norm_HH, Data_phase_2$changeDV)
+oneWayAnova(Data_phase_2$norm_TA, Data_phase_2$changeDV)
+oneWayAnova(Data_phase_2$norm_RWA_positive, Data_phase_2$changeDV, Parametric = FALSE)
+```
 
