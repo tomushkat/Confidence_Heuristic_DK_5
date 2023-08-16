@@ -16,7 +16,7 @@ Re-selection chi square
 GoF(Data_phase_1$DV_2, Probs = c(0.5, 0.5))
 ```
 
-Selection beavior chi square
+Selection behavior chi square
 ```{r}
 GoF(Data_phase_1$changeDV[Data_phase_1$changeDV != 'change_To_Know'], Probs = c(1 / 3, 1 / 3, 1 / 3))
 ```
@@ -26,12 +26,12 @@ Who was more confidant?
 t_1 <- Data_phase_1 %>% 
   filter(conf_first == 'DK') %>% 
   mutate(confidance_identity = 'IDK') %>% 
-  select(confidance = Confi_first, confidance_identity, Q1)
+  select(confidance = Confi_first, confidance_identity, Q1, DV_1)
 t_2 <- 
 Data_phase_1 %>% 
   filter(conf_second == 'DK') %>% 
   mutate(confidance_identity = 'IDK') %>% 
-  select(confidance = Confi_second, confidance_identity, Q1)
+  select(confidance = Confi_second, confidance_identity, Q1, DV_1)
 t_3 <- rbind(t_1, t_2)  
 
 
@@ -39,12 +39,12 @@ t_4 <-
 Data_phase_1 %>% 
   filter(conf_first == 'Know') %>% 
   mutate(confidance_identity = 'Know') %>% 
-  select(confidance = Confi_first, confidance_identity, Q1)
+  select(confidance = Confi_first, confidance_identity, Q1, DV_1)
 t_5 <- 
 Data_phase_1 %>% 
   filter(conf_second == 'Know') %>% 
   mutate(confidance_identity = 'Know') %>% 
-  select(confidance = Confi_second, confidance_identity, Q1)
+  select(confidance = Confi_second, confidance_identity, Q1, DV_1)
 t_6 <- rbind(t_4, t_5)  
 
 t_7 <- rbind(t_3, t_6)
@@ -52,38 +52,54 @@ t_7 %>%
   arrange(Q1, confidance_identity)
 
 pairedT(t_7$confidance, t_7$confidance_identity, Within = t_7$Q1)
+
+
+t_7 %>% 
+  group_by(DV_1, confidance_identity) %>% 
+  summarise(M = mean(confidance)
+            , N = length(confidance))
+
+ez::ezANOVA(data = t_7, wid =  Q1, between = DV_1, within = confidance_identity, dv = confidance)
 ```
 
 Who was more accurate?
 ```{r}
 t_1 <- Data_phase_1 %>% 
   filter(correctness_first == 'DK') %>% 
-  mutate(confidance_identity = 'IDK') %>% 
-  select(Accuracy = correct_first, confidance_identity, Q1)
+  mutate(correctness_identity = 'IDK') %>% 
+  select(Accuracy = correct_first, correctness_identity, Q1, DV_1)
 t_2 <- 
 Data_phase_1 %>% 
   filter(correctness_second == 'DK') %>% 
-  mutate(confidance_identity = 'IDK') %>% 
-  select(Accuracy = correct_second, confidance_identity, Q1)
+  mutate(correctness_identity = 'IDK') %>% 
+  select(Accuracy = correct_second, correctness_identity, Q1, DV_1)
 t_3 <- rbind(t_1, t_2)  
 
 
 t_4 <- 
 Data_phase_1 %>% 
   filter(correctness_first == 'Know') %>% 
-  mutate(confidance_identity = 'Know') %>% 
-  select(Accuracy = correct_first, confidance_identity, Q1)
+  mutate(correctness_identity = 'Know') %>% 
+  select(Accuracy = correct_first, correctness_identity, Q1, DV_1)
 t_5 <- 
 Data_phase_1 %>% 
   filter(correctness_second == 'Know') %>% 
-  mutate(confidance_identity = 'Know') %>% 
-  select(Accuracy = correct_second, confidance_identity, Q1)
+  mutate(correctness_identity = 'Know') %>% 
+  select(Accuracy = correct_second, correctness_identity, Q1, DV_1)
 t_6 <- rbind(t_4, t_5)  
 
 t_7 <- rbind(t_3, t_6)
 
 
-pairedT(t_7$Accuracy, t_7$confidance_identity, Within = t_7$Q1)
+pairedT(t_7$Accuracy, t_7$correctness_identity, Within = t_7$Q1)
+
+t_7 %>% 
+  group_by(DV_1, correctness_identity) %>% 
+  summarise(M = mean(Accuracy)
+            , N = length(Accuracy))
+
+ez::ezANOVA(data = t_7, wid = Q1, between = DV_1, within = correctness_identity, dv = Accuracy)
+
 ```
 
 ```{r}
@@ -190,6 +206,7 @@ test_theoretical_dist(Data_phase_2$norm_RWA_positive)
 
 chart.Correlation(Data_phase_2[, c('norm_ITU_positive', 'norm_HH', 'norm_TA', 'norm_RWA_positive')], histogram = TRUE, pch = 19, method = 'pearson')
 ```
+
 ## Questionnaires ~ First selection
 ### num_ITU_positive ~ selection 
 ```{r}

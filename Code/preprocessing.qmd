@@ -203,11 +203,13 @@ Data_phase_1 <- rbind(brownKnow, blueKnow) %>%
 ```{r}
 Data_3 <- Data_phase_1 %>% 
   inner_join(survay_data, by = 'Q1') 
-  
-Data_4 <- Data_3 %>% 
-  filter(`Duration (in seconds) 2` / 60 <= 20
-         , Attention_2 == '6\n(Slightly agree)\n')
 
+  
+Data_4 <-
+  Data_3 %>% 
+  filter((`Duration (in seconds) 2` / 60) <= 20
+         , Attention_2 == '6\n(Slightly agree)\n'
+         , Check_1 %in% c('1\n(Very strongly disagree)', '2\n(Strongly disagree)\n'))
 
 
 be_numeric <- function(data, question, reverse = FALSE) {
